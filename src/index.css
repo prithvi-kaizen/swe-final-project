@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-inkPrimary font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .clip-pixel {
+    shape-rendering: crispEdges;
+  }
+}
+
+/* Global Standardized Easing */
+* {
+  @apply tracking-tight;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-semibold;
+}
+
+.font-mono {
+  @apply tracking-normal;
+}
+
+/* Custom Scrollbar for better UI aesthetics */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-borderLight rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-inkMuted;
+}
