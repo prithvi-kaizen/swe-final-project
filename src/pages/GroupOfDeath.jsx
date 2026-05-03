@@ -5,25 +5,32 @@ import clsx from 'clsx';
 
 export const GroupOfDeath = () => {
   const { data } = useData();
-  const matches = data['matches'] || [];
-  const teams = data['teams'] || [];
 
   const topGroups = useMemo(() => {
+    const matches = data['matches'] || [];
+    const teams = data['teams'] || [];
+    const tournaments = data['tournaments'] || [];
+
     if (!matches.length || !teams.length) return [];
 
     const FINISH_POINTS = {
-      'first group stage': 0,
       'group stage': 0,
+      'first group stage': 0,
       'second group stage': 2,
       'round of 16': 4,
       'quarter-finals': 6,
       'semi-finals': 8,
       'third-place match': 7,
+      'final round': 9,
       'final': 9 // Champion is overwritten to 10 below.
     };
 
     const teamNames = {};
-    teams.forEach(t => teamNames[t.team_id] = t.team_name);
+    const teamIdsByName = {};
+    teams.forEach(t => {
+      teamNames[t.team_id] = t.team_name;
+      teamIdsByName[t.team_name] = t.team_id;
+    });
 
     // 1. Map each team per tournament to their highest finish points.
     const teamDepth = {}; // { year: { team_id: points } }
@@ -45,14 +52,25 @@ export const GroupOfDeath = () => {
        const year = m.tournament_id.split('-')[1];
        const homeS = m.home_team_score + (m.home_team_score_penalties || 0);
        const awayS = m.away_team_score + (m.away_team_score_penalties || 0);
-       if (homeS > awayS) teamDepth[year][m.home_team_id] = 10;
-       else if (awayS > homeS) teamDepth[year][m.away_team_id] = 10;
+       if (m.home_team_win || homeS > awayS) teamDepth[year][m.home_team_id] = 10;
+       else if (m.away_team_win || awayS > homeS) teamDepth[year][m.away_team_id] = 10;
     });
 
-    // 2. Identify Groups and their member teams
+    // Some early tournaments, notably 1950, decided the winner in a final round.
+    tournaments.forEach(t => {
+      const year = String(t.year);
+      const winnerId = teamIdsByName[t.winner];
+      if (winnerId && teamDepth[year]) {
+        teamDepth[year][winnerId] = 10;
+      }
+    });
+
+    // 2. Identify only first-round groups and their member teams.
+    // The dataset also uses group_name for second group stages, so stage_name
+    // must be an exact match or later-round teams get merged into fake groups.
     const groups = {}; // { groupKey: { year, name, teams: Set } }
     matches.forEach(m => {
-       if (m.stage_name.toLowerCase().includes('group stage')) {
+       if (m.stage_name.toLowerCase() === 'group stage') {
          const year = m.tournament_id.split('-')[1];
          // Example group_name: "Group A", "Group 1", "Group B"
          const groupName = m.group_name;
@@ -69,7 +87,7 @@ export const GroupOfDeath = () => {
 
     // 3. Calculate Group Score (higher is harder)
     const rankedGroups = Object.values(groups)
-      .filter(g => g.teams.size >= 3) // ensure valid group sizes
+      .filter(g => g.teams.size >= 3 && g.teams.size <= 4) // ensure first-round group sizes
       .map(g => {
         let totalScore = 0;
         const members = Array.from(g.teams).map(tId => {
@@ -90,12 +108,21 @@ export const GroupOfDeath = () => {
       .slice(0, 10);
 
     return rankedGroups;
-  }, [matches, teams]);
+  }, [data]);
 
 
   const [expandedKey, setExpandedKey] = useState(null);
 
-  const STAGE_LABELS = { 0: 'Champions', 1: 'Final', 2: 'SF', 3: '3rd Place', 4: 'QF', 6: 'R16', 8: '2nd Grp', 10: 'Group Stage' };
+  const STAGE_LABELS = {
+    0: 'Group Stage',
+    2: '2nd Grp',
+    4: 'R16',
+    6: 'QF',
+    7: '3rd Place',
+    8: 'SF',
+    9: 'Final',
+    10: 'Champions'
+  };
 
   return (
     <div className="w-full h-full flex flex-col gap-6 max-w-4xl mx-auto">
