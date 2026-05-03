@@ -249,8 +249,19 @@ export const Chatbot = () => {
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="pb-1 font-mono text-xl leading-none px-2 rounded-full transition-colors"
-                style={isMessi ? { color: ARG_THEME.textMuted } : { color: 'rgba(255,255,255,0.7)' }}
+                className="font-mono text-xl leading-none px-2.5 py-0.5 rounded-full transition-colors"
+                style={isMessi
+                  ? {
+                      color: '#071D3A',
+                      background: ARG_THEME.gold,
+                      boxShadow: '0 0 14px rgba(246,180,14,0.32)',
+                    }
+                  : {
+                      color: '#1A1A1A',
+                      background: '#F6B40E',
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.35)',
+                    }
+                }
               >
                 x
               </button>
