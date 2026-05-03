@@ -62,6 +62,20 @@ The dashboard works without chatbot credentials. To enable Hey FIFA locally, cre
 cp .env.example .env
 ```
 
+Add API keys from the provider websites:
+
+- Create a Groq API key at `https://console.groq.com/keys`
+- Create a Tavily API key at `https://tavily.com/`
+
+Your `.env` file should use Vite environment variable names:
+
+```env
+VITE_GROQ_API_KEY=your_groq_api_key
+VITE_TAVILY_API_KEY=your_tavily_api_key
+```
+
+Restart the dev server after editing `.env` so Vite can load the new values.
+
 No credentials are committed to this repository.
 
 ## Project Structure
