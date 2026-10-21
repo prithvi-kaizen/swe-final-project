@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { useLocation } from 'react-router-dom';
-import Groq from 'groq-sdk';
-
-const SYSTEM_PROMPT = "You are a FIFA World Cup analyst with deep knowledge of WC history from 1930 to 2022. You have access to real-time web search. Answer analytically - give numbers, cite patterns, compare eras. Never be vague. Keep responses concise and sharp. No filler phrases. Use Markdown for formatting.";
-const TRIGGER_KEYWORDS = ["2026", "current", "latest", "recent", "predict", "news"];
 
 // Route-specific suggested questions
 const ROUTE_SUGGESTIONS = {
@@ -62,13 +59,6 @@ const DEFAULT_SUGGESTIONS = [
   "WC 2026 favorites?",
 ];
 
-let groqClient = null;
-try {
-  groqClient = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
-} catch (e) {
-  console.error("Failed to initialize API clients", e);
-}
-
 // Argentina theme tokens (used on /wonders route)
 const ARG_THEME = {
   bg:         '#000B1E',
@@ -113,7 +103,7 @@ export const Chatbot = () => {
   }, [location.pathname]);
 
   const handleQuery = async (query) => {
-    if (!query.trim() || !groqClient) return;
+    if (!query.trim() || isLoading) return;
 
     const newMsg = { role: 'user', content: query };
     setMessages(p => [...p, newMsg]);
@@ -121,47 +111,15 @@ export const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const lowerQuery = query.toLowerCase();
-      const needsSearch = TRIGGER_KEYWORDS.some(kw => lowerQuery.includes(kw));
-      let contextMsg = null;
-
-      if (needsSearch) {
-        const response = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: import.meta.env.VITE_TAVILY_API_KEY,
-            query: query,
-            search_depth: "advanced",
-            include_answer: true
-          })
-        });
-
-        if (response.ok) {
-          const searchRes = await response.json();
-          const contextStr = `TAVILY SEARCH RESULTS:\nDirect Answer: ${searchRes.answer}\nContext:\n${searchRes.results.map(r => r.content).join("\n")}`;
-          contextMsg = { role: 'system', content: contextStr };
-        }
-      }
-
-      const apiMessages = [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages.map(m => ({ role: m.role, content: m.content })),
-        newMsg
-      ];
-
-      if (contextMsg) {
-        apiMessages.splice(apiMessages.length - 1, 0, contextMsg);
-      }
-
-      const completion = await groqClient.chat.completions.create({
-        messages: apiMessages,
-        model: "llama-3.3-70b-versatile",
+      const response = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...messages, newMsg].slice(-12) }),
       });
-
-      setMessages(p => [...p, { role: 'assistant', content: completion.choices[0].message.content }]);
-    } catch {
-      setMessages(p => [...p, { role: 'assistant', content: 'Simulation Error: Connection to Oracle failed.' }]);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'The chatbot is unavailable.');
+      setMessages(p => [...p, { role: 'assistant', content: result.content }]);
+    } catch (error) {
+      setMessages(p => [...p, { role: 'assistant', content: error.message || 'The chatbot is unavailable. Please try again later.' }]);
     } finally {
       setIsLoading(false);
     }
@@ -325,7 +283,7 @@ export const Chatbot = () => {
                         ? { background: '#2D5A27', color: 'white', borderRadius: '16px 16px 4px 16px' }
                         : { background: '#F1F5F9', color: '#1A1A1A', border: '1px solid #E2E8F0', borderRadius: '16px 16px 16px 4px' }
                     }
-                    dangerouslySetInnerHTML={{ __html: marked.parse(m.content) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content)) }}
                   />
                 </div>
               ))}
@@ -354,6 +312,8 @@ export const Chatbot = () => {
               <div className="flex w-full items-center rounded-full overflow-hidden" style={{ background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
                 <input
                   type="text"
+                  maxLength={2000}
+                  aria-label="World Cup question"
                   value={inputStr}
                   onChange={e => setInputStr(e.target.value)}
                   placeholder={`Ask about ${sectionLabel}...`}
